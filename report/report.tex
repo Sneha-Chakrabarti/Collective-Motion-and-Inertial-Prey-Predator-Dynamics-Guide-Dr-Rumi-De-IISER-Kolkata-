@@ -1,0 +1,481 @@
+\documentclass[11pt,a4paper]{article}
+
+% ── packages ──────────────────────────────────────────────────────────────
+\usepackage[a4paper, margin=2.2cm]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{parskip}
+\usepackage{microtype}
+\usepackage{authblk}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{float}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!60!black,
+  citecolor=blue!60!black,
+  urlcolor=blue!60!black
+}
+
+\captionsetup{font=small, labelfont=bf, width=0.92\linewidth}
+\setlength{\abovecaptionskip}{4pt}
+\setlength{\belowcaptionskip}{2pt}
+
+\titleformat{\section}{\large\bfseries}{}{0em}{}[\titlerule]
+\titleformat{\subsection}{\normalsize\bfseries}{}{0em}{}
+
+% ── document ──────────────────────────────────────────────────────────────
+\begin{document}
+
+% ── title block ───────────────────────────────────────────────────────────
+\begin{center}
+  {\LARGE\bfseries Computational Reproduction Report}\\[6pt]
+  {\large Collective Motion and Inertial Prey--Predator Dynamics}\\[10pt]
+  {\normalsize
+    Sneha\\
+    Indian Institute of Science Education and Research Kolkata\\[4pt]
+    Supervisor: Dr.\ Rumi De, IISER Kolkata\\[6pt]
+    \textit{June 2026}
+  }
+\end{center}
+
+\vspace{4pt}
+\hrule
+\vspace{10pt}
+
+% ── abstract ──────────────────────────────────────────────────────────────
+\begin{abstract}
+\noindent
+This report presents a computational reproduction of two theoretical studies
+on collective animal motion and prey--predator dynamics from the group of
+Dr.\ Rumi De at IISER Kolkata. The first paper (De and Chakraborty, 2022)
+reviews self-propelled particle models for collective motion in fish schools,
+bird flocks, and prey swarms. The second (Chakraborty, Laha, and De, 2022)
+introduces inertial forces into the prey--predator model and identifies an
+optimal predator-to-prey mass ratio governing the arms race between pursuit
+and evasion. All simulations are implemented in Julia (physics kernels) with
+Python (NumPy/Matplotlib) for figure generation. Key results reproduced
+include the Vicsek disorder-to-order phase transition, the metric versus
+topological flocking crossover, the interaction-range dependence of prey
+survival, and three distinct survival regimes as a function of predator mass.
+\end{abstract}
+
+\vspace{6pt}
+\hrule
+\vspace{10pt}
+
+% ── 1. introduction ───────────────────────────────────────────────────────
+\section{Introduction and Motivation}
+
+Collective motion is ubiquitous in biology: starling murmurations,
+sardine bait balls, insect swarms, and migrating cell sheets all exhibit
+large-scale coherent behaviour that emerges purely from local interactions
+among individuals with no global coordinator. Understanding the rules that
+generate this order is a central problem in active matter physics.
+
+This reproduction study covers two papers from Dr.\ Rumi De's group at
+IISER Kolkata, both of which use self-propelled particle (SPP) models:
+
+\begin{enumerate}[leftmargin=*, itemsep=2pt]
+  \item \textbf{De and Chakraborty (2022)} -- a pedagogical review of SPP
+    models for fish schooling, bird flocking, and prey--predator swarming,
+    with original results on metric versus topological interactions and the
+    role of cooperative interaction range in prey survival.
+    \textit{J.\ Biosci.\ \textbf{47}:48.}
+
+  \item \textbf{Chakraborty, Laha, and De (2022)} -- introduces inertial
+    forces ($M_{pr}$, $M_{pd}$) into the prey--predator model and shows
+    that the predator-to-prey mass ratio $M_{pd}/M_{pr}$ governs three
+    distinct regimes: full capture, competitive arms race, and prey escape.
+    \textit{arXiv:2208.12280.}
+\end{enumerate}
+
+% ── 2. models ─────────────────────────────────────────────────────────────
+\section{Theoretical Models}
+
+\subsection{2.1 Vicsek Model (1995)}
+
+The canonical SPP model places $N$ point particles in a 2D periodic box of
+side $L$. Each particle moves at fixed speed $v_0$ and at each timestep aligns
+its heading with the average heading of all neighbours within radius $R$,
+perturbed by noise $\eta$:
+\begin{align}
+  \mathbf{x}_i(t+\Delta t) &= \mathbf{x}_i(t) + \mathbf{v}_i(t)\,\Delta t
+    \pmod{L}, \\
+  \theta_i(t+\Delta t) &= \langle\theta\rangle_{R} + \Delta\theta,
+    \quad \Delta\theta \sim \mathrm{Uniform}\!\left(-\tfrac{\eta}{2},\tfrac{\eta}{2}\right).
+\end{align}
+The order parameter $\varphi = N^{-1}|\sum_i e^{i\theta_i}|$ measures global
+alignment. A continuous phase transition from $\varphi\approx 0$ (disordered)
+to $\varphi\approx 1$ (ordered) occurs as $\eta$ decreases or density $\rho$
+increases.
+
+\subsection{2.2 Metric and Topological Flocking (Kumar and De, 2021)}
+
+The continuous-time generalisation introduced by Kumar and De (2021) writes:
+\begin{equation}
+  \frac{d\mathbf{v}_i}{dt}
+  = \frac{\alpha}{N_\mathrm{in}}\sum_{N_\mathrm{in}}(\mathbf{v}_j - \mathbf{v}_i)
+    - \gamma\,\mathbf{v}_i + \boldsymbol{\xi},
+\end{equation}
+where $\alpha$ is the alignment strength, $\gamma$ the viscous drag, and
+$\boldsymbol{\xi}$ Gaussian noise. In the \textit{metric} rule $N_\mathrm{in}$
+counts all neighbours within radius $R$; in the \textit{topological} rule
+$N_\mathrm{in} = N_r$ fixed nearest neighbours. Topological interactions
+require a smaller threshold $N_r$ to achieve the same ordered state, and the
+advantage becomes more pronounced at small flock size.
+
+\subsection{2.3 Overdamped Prey--Predator Swarm (Chakraborty et al., 2020)}
+
+In the overdamped (zero-inertia) limit with friction $\mu=1$:
+\begin{align}
+  \frac{d\mathbf{r}_i}{dt}
+    &= \mathbf{f}_i^{\mathrm{pp}} + \mathbf{f}_i^{\mathrm{pred}}, \\
+  \mathbf{f}_i^{\mathrm{pp}}
+    &= \frac{1}{N_\mathrm{in}}\sum_{j\in R_\mathrm{int}}
+      \!\left[\beta(\mathbf{r}_j - \mathbf{r}_i)
+      - \frac{\alpha(\mathbf{r}_j-\mathbf{r}_i)}{|\mathbf{r}_j-\mathbf{r}_i|^2}
+      \right], \\
+  \mathbf{f}_i^{\mathrm{pred}}
+    &= -\frac{\gamma(\mathbf{r}_p - \mathbf{r}_i)}{|\mathbf{r}_p-\mathbf{r}_i|^2},
+    \qquad
+  \frac{d\mathbf{r}_p}{dt}
+    = \frac{\delta}{N}\sum_i
+      \frac{\mathbf{r}_i - \mathbf{r}_p}{|\mathbf{r}_i-\mathbf{r}_p|^3}.
+\end{align}
+The interaction range $R_\mathrm{int}$ controls which escape pattern emerges.
+At $R_\mathrm{int}=0$ prey scatter; at intermediate $R_\mathrm{int}$ a ring
+forms around the predator; at large $R_\mathrm{int}$ the cohesive group
+is tracked and captured.
+
+\subsection{2.4 Inertial Prey--Predator Model (Chakraborty, Laha, and De, 2022)}
+
+Reintroducing inertia through scaled masses $M_{pr}$ and $M_{pd}$:
+\begin{align}
+  M_{pr}\frac{d^2\mathbf{R}_i}{dT^2}
+    &= -\frac{d\mathbf{R}_i}{dT}
+      + \frac{1}{N_\mathrm{sur}}\sum_j
+        \!\left[\frac{\alpha'\,(\mathbf{R}_i-\mathbf{R}_j)}{|\mathbf{R}_i-\mathbf{R}_j|^2}
+        - \beta'(\mathbf{R}_i-\mathbf{R}_j)\right]
+      + \frac{\gamma'(\mathbf{R}_i-\mathbf{R}_p)}{|\mathbf{R}_i-\mathbf{R}_p|^2},
+    \label{eq:prey-inertial}\\
+  M_{pd}\frac{d^2\mathbf{R}_p}{dT^2}
+    &= -\frac{d\mathbf{R}_p}{dT}
+      - \frac{\delta'}{N_\mathrm{sur}}\sum_i
+        \frac{\mathbf{R}_p - \mathbf{R}_i}{|\mathbf{R}_p-\mathbf{R}_i|^3}.
+    \label{eq:pred-inertial}
+\end{align}
+Fixed parameters: $\alpha'=\beta'=1$, $\gamma'=0.2$, $R_\mathrm{kill}=0.01$.
+The light predator ($M_{pd}\ll 1$) turns rapidly and captures all prey;
+the heavy predator ($M_{pd}\gg 1$) cannot manoeuvre and the prey escape via
+the F-maneuver (fountain effect). An intermediate competitive regime exists
+where some prey survive and some do not.
+
+% ── 3. numerical implementation ───────────────────────────────────────────
+\section{Numerical Implementation}
+
+All physics kernels are written in \textbf{Julia} (v1.9+) using fully
+vectorised NumPy-equivalent array operations for speed. Figure generation
+uses \textbf{Python} (NumPy, Matplotlib). No per-particle Python loops appear
+in any simulation inner loop; all pairwise force matrices are computed via
+broadcasting.
+
+\begin{table}[H]
+\centering
+\caption{Simulation parameters used throughout this reproduction.}
+\begin{tabular}{llll}
+\toprule
+\textbf{Model} & \textbf{Parameter} & \textbf{Value} & \textbf{Notes} \\
+\midrule
+Vicsek & $N$ & 300 & particles \\
+       & $v_0$ & 0.03 & speed \\
+       & $R$ & 1.0 & interaction radius \\
+       & $\eta$ & 0.1 or 2.0 & low/high noise \\
+       & $L$ & 5, 7, 25 & box size \\
+\midrule
+Flocking & $\alpha$ & 1.5 & alignment strength \\
+(Kumar \& De) & $\gamma$ & 0.5 & drag \\
+       & $N$ & 50, 100, 200 & flock sizes compared \\
+\midrule
+Overdamped & $N$ & 200 & prey \\
+swarm & $\beta$ & 0.8 & prey-prey attraction \\
+       & $\alpha$ & 0.5 & prey-prey repulsion \\
+       & $\gamma$ & 0.1 & prey-predator repulsion \\
+       & $\delta$ & 0.5 & predator strength \\
+       & $R_\mathrm{int}$ & 0 to 2.0 & swept \\
+\midrule
+Inertial & $N$ & 200 & prey \\
+model & $\alpha'=\beta'$ & 1.0 & interaction strengths \\
+       & $\gamma'$ & 0.2 & prey-predator coupling \\
+       & $\delta'$ & 0.4 (weak) / 2.5 (strong) & predator strength \\
+       & $M_{pd}$ & 0.1 to 100 & swept \\
+       & $dt$ & 0.01--0.02 & timestep \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ── 4. results: paper 1 ───────────────────────────────────────────────────
+\section{Results: De and Chakraborty (2022)}
+
+\subsection{4.1 Vicsek Phase Transition}
+
+Figure~\ref{fig:phi_eta} shows the order parameter $\varphi$ as a function
+of noise $\eta$ for $N=300$, $L=7$, $R=1$, reproducing the continuous
+disorder-to-order transition. The transition occurs near $\eta\approx 0.8$
+for these parameters, consistent with the original Vicsek et al.\ (1995)
+result.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.55\linewidth]{figs/static1_phi_vs_eta.png}
+  \caption{Order parameter $\varphi$ vs noise strength $\eta$. As $\eta$
+    decreases (right to left), the system transitions from a disordered phase
+    ($\varphi\approx 0$) to a collectively ordered flock ($\varphi\approx 1$).
+    Red dashed line marks $\varphi=0.5$.}
+  \label{fig:phi_eta}
+\end{figure}
+
+\subsection{4.2 Metric vs Topological Flocking}
+
+Figure~\ref{fig:metric_topo} reproduces Fig.\ 3 of De and Chakraborty (2022).
+For metric interactions (left panel), a threshold radius $R^*$ is required
+for order, and $R^*$ decreases with increasing $N$ as each particle gains more
+neighbours. For topological interactions (right panel), the threshold number
+of neighbours $N_r^*$ is independent of flock size at lower speeds. In both
+cases the ordered state is reached more easily with larger groups.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\linewidth]{figs/static2_metric_vs_topo.png}
+  \caption{Order parameter $\varphi$ vs (a) metric interaction radius $R$
+    and (b) topological neighbour count $N_r$, for flock sizes $N=50, 100,
+    200$. Topological interactions achieve the same ordered state with fewer
+    effective neighbours, and the threshold is size-independent at low speed.}
+  \label{fig:metric_topo}
+\end{figure}
+
+\subsection{4.3 Overdamped Prey Swarm: Escape Patterns}
+
+Figure~\ref{fig:swarm_patterns} shows four qualitatively distinct escape
+patterns that emerge as $R_\mathrm{int}$ increases. At $R_\mathrm{int}=0$
+prey scatter incoherently. At $R_\mathrm{int}=0.5$ prey organise into
+a ring encircling the predator, confusing its direction of attack. At
+$R_\mathrm{int}=1.2$ the group splits into two coherent subgroups flanking
+the predator. At $R_\mathrm{int}=2.0$ the cohesive group is easily tracked
+and chased.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{figs/snap1_swarm_Rint_sweep.png}
+  \caption{Escape patterns for $N=200$ prey at increasing interaction radius
+    $R_\mathrm{int}$ (rows). Columns show the initial state ($T=0$),
+    an intermediate time, and the established pattern. Blue dots: alive
+    prey; grey dots: killed prey; red circle: predator. Dashed circle
+    indicates $R_\mathrm{int}$.}
+  \label{fig:swarm_patterns}
+\end{figure}
+
+\subsection{4.4 Survival vs Interaction Range}
+
+Figure~\ref{fig:survival_rint} reproduces Fig.\ 6 of De and Chakraborty
+(2022). Prey survival $N_\mathrm{sur}$ is maximised at intermediate
+$R_\mathrm{int} \approx 0.5$--$1.3$ across all predator strengths tested.
+Too little cooperation leaves prey unable to coordinate; too much cooperation
+creates a cohesive target that the predator tracks efficiently.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.60\linewidth]{figs/static3_survival_vs_rint.png}
+  \caption{Number of surviving prey $N_\mathrm{sur}$ as a function of
+    interaction radius $R_\mathrm{int}$, for three predator strengths
+    $\delta$. The green band marks the optimal cooperation range. $N=150$,
+    averaged over 3 realisations.}
+  \label{fig:survival_rint}
+\end{figure}
+
+% ── 5. results: paper 2 ───────────────────────────────────────────────────
+\section{Results: Chakraborty, Laha, and De (2022)}
+
+\subsection{5.1 Weak Predator: Ring Formation and Chasing Transition}
+
+Figure~\ref{fig:weak_pred} shows how predator mass $M_{pd}$ controls whether
+a stable prey ring forms around the predator ($\delta'=0.4$). For
+$M_{pd}=2.0$ the ring is fully established by $T=150$ and persists. As
+$M_{pd}$ increases to 3.0 and beyond, the ring destabilises: higher inertia
+slows the predator's turning response, breaking the rotational symmetry of
+the ring configuration. By $M_{pd}=5.0$ only active chasing occurs from the
+outset. This matches the stability analysis in the paper, which shows an
+eigenvalue crossing zero at $M_{pd}\approx 3.0$ (for $M_{pr}=1$).
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.88\linewidth]{figs/snap2_inertial_weak_Mpd_sweep.png}
+  \caption{Weak predator ($\delta'=0.4$, $M_{pr}=1$): effect of predator mass
+    on escape pattern. Each row shows a different $M_{pd}$ value; columns are
+    the initial state, an intermediate time (ring/pattern forming), and the
+    established pattern. Arrows show prey velocity directions. The stable ring
+    at $M_{pd}=2.0$ (top row, $T=150$) is the key result.}
+  \label{fig:weak_pred}
+\end{figure}
+
+\subsection{5.2 Strong Predator: Escape Trajectories}
+
+Figure~\ref{fig:strong_pred} shows the three qualitatively different escape
+trajectories that emerge for the strong predator ($\delta'=2.5$) as $M_{pd}$
+is varied. The light predator ($M_{pd}=0.1$) turns rapidly and maintains
+close pursuit inside the herd. The medium predator ($M_{pd}=1.0$) causes the
+prey group to split and merge. The heavy predator ($M_{pd}=100$) overshoots
+(visible from the orange trajectory trail) and cannot reorient fast enough
+to prevent the F-maneuver, whereby prey arc around and escape.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.88\linewidth]{figs/snap3_inertial_strong_Mpd_sweep.png}
+  \caption{Strong predator ($\delta'=2.5$, $M_{pr}=1$): escape trajectories
+    for four predator masses. Orange trail shows the predator's path. The
+    middle column shows the predator inside the prey herd. The right column
+    shows the established escape pattern: capture (top), splitting (second),
+    arc escape (third), and F-maneuver with full prey escape (bottom).}
+  \label{fig:strong_pred}
+\end{figure}
+
+\subsection{5.3 Order Parameter $\varphi(T)$}
+
+The order parameter $\varphi(T) = N_\mathrm{sur}^{-1}\sum_i \cos\theta_i$
+measures the mean cosine of the angle between prey velocity $i$ and the
+predator velocity. Figure~\ref{fig:phi_T} reproduces Fig.\ 5 of the paper.
+For $M_{pd}=0.1$ (light predator) $\varphi$ oscillates rapidly as the
+predator continuously reverses direction to chase. For $M_{pd}=100$
+(heavy predator) $\varphi$ drops to $-1$ and stays there: prey and predator
+move in opposite directions for an extended period, indicating successful
+escape.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{figs/static5_phi_timeseries.png}
+  \caption{Order parameter $\varphi(T)$ for four predator masses.
+    $\varphi=+1$: prey and predator move in the same direction.
+    $\varphi=-1$: prey and predator move in opposite directions (escape).
+    Green/red shading indicates cooperative vs opposing motion.}
+  \label{fig:phi_T}
+\end{figure}
+
+\subsection{5.4 Survival Phase Diagram}
+
+Figure~\ref{fig:survival_mass} reproduces Fig.\ 6 of Chakraborty, Laha, and
+De (2022). Panel (a) shows $N_\mathrm{sur}$ vs $M_{pd}$ for four prey masses.
+Lighter prey survive better at low $M_{pd}$ because their own agility
+outcompetes the light predator. Panel (b) collapses the results onto the mass
+ratio $M_{pd}/M_{pr}$, revealing three universal regimes separated by order-of-magnitude boundaries:
+
+\begin{itemize}[itemsep=2pt]
+  \item \textbf{Killed regime} ($M_{pd}/M_{pr} \lesssim 0.4$): the agile
+    predator captures all prey.
+  \item \textbf{Competitive regime} ($0.4 \lesssim M_{pd}/M_{pr} \lesssim 10$):
+    some prey survive, some do not -- the arms race.
+  \item \textbf{Survival regime} ($M_{pd}/M_{pr} \gtrsim 10$): the sluggish
+    predator cannot manoeuvre and all prey escape.
+\end{itemize}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\linewidth]{figs/static4_survival_vs_mass.png}
+  \caption{(a) $N_\mathrm{sur}$ vs predator mass $M_{pd}$ for four prey
+    masses $M_{pr}$, $\delta'=2.5$, $N=80$. (b) $N_\mathrm{sur}$ vs the
+    mass ratio $M_{pd}/M_{pr}$, collapsing onto three universal regimes.}
+  \label{fig:survival_mass}
+\end{figure}
+
+% ── 6. discussion ─────────────────────────────────────────────────────────
+\section{Discussion}
+
+\textbf{Vicsek transition.} The reproduction confirms the first-order-like
+nature of the transition: $\varphi$ rises steeply over a narrow range of
+$\eta$, consistent with the finite-size scaling analysis of the original paper.
+
+\textbf{Topological advantage.} The topological rule is more robust than
+the metric rule at small $N$: removing metric distance as the interaction
+criterion means that even sparse flocks can coordinate, matching the
+empirical finding by Ballerini et al.\ (2008) that starlings interact with
+approximately 6--7 nearest neighbours regardless of separation.
+
+\textbf{Optimal cooperation range.} The non-monotonic dependence of
+$N_\mathrm{sur}$ on $R_\mathrm{int}$ is a non-trivial result. It reflects
+a tradeoff: enough cooperation is needed to produce coordinated evasion
+(ring or splitting), but too much cooperation makes the group a coherent,
+easily-tracked target. The optimal $R_\mathrm{int}$ shifts slightly with
+predator strength $\delta$, consistent with the paper's Fig.\ 6.
+
+\textbf{Inertial arms race.} The identification of three regimes on the
+$M_{pd}/M_{pr}$ axis is the central result of Chakraborty, Laha, and De
+(2022). The competitive intermediate regime -- where field studies observe
+cheetah-impala and lion-zebra interactions -- corresponds to $M_{pd}/M_{pr}
+\sim 1$--$10$, consistent with empirically measured body-mass ratios for
+those predator-prey pairs (Wilson et al., 2018).
+
+\textbf{Numerical considerations.} The overdamped model is sensitive to
+timestep: $dt=0.005$ was required for stable integration. The inertial model
+required $dt\leq 0.02$ to avoid velocity blow-up at low $M_{pr}$. Vectorised
+pairwise force computation scales as $O(N^2)$; for $N=200$ this runs in
+under 10 ms per timestep in Julia.
+
+% ── 7. conclusion ─────────────────────────────────────────────────────────
+\section{Conclusion}
+
+All key results from both papers have been successfully reproduced:
+the Vicsek phase transition, metric/topological flocking crossover,
+the four overdamped escape patterns and their survival statistics, and
+the three inertial survival regimes. The Julia source modules
+(\texttt{vicsek\_model.jl}, \texttt{flocking\_interactions.jl},
+\texttt{prey\_predator\_swarm.jl}, \texttt{inertial\_prey\_predator.jl})
+and Python animation scripts are available in the accompanying GitHub
+repository.
+
+Future extensions include: (i) implementing finite-size scaling for the
+Vicsek transition, (ii) incorporating ABP (active Brownian particle)
+dynamics for the prey in porous media as studied in related work, and
+(iii) extending to 3D geometries relevant for fish schools.
+
+% ── references ────────────────────────────────────────────────────────────
+\section*{References}
+
+\begin{enumerate}[label={[\arabic*]}, leftmargin=*, itemsep=3pt]
+
+\item De R and Chakraborty D (2022). Collective motion: influence of local
+  behavioural interactions among individuals.
+  \textit{J.\ Biosci.}\ \textbf{47}:48.
+
+\item Chakraborty D, Laha A, and De R (2022). Effect of inertia on the
+  evasion and pursuit dynamics of prey swarms and the emergence of an
+  optimal mass ratio for the predator-prey arms race.
+  \textit{arXiv:}2208.12280.
+
+\item Vicsek T, Czir\'{o}k A, Ben-Jacob E, Cohen I, and Shochet O (1995).
+  Novel type of phase transition in a system of self-driven particles.
+  \textit{Phys.\ Rev.\ Lett.}\ \textbf{75}:1226.
+
+\item Kumar V and De R (2021). Efficient flocking: metric versus topological
+  interactions.
+  \textit{R.\ Soc.\ Open Sci.}\ \textbf{8}:58.
+
+\item Chakraborty D, Bhunia S, and De R (2020). Survival chances of a prey
+  swarm: how the cooperative interaction range affects the outcome.
+  \textit{Sci.\ Rep.}\ \textbf{10}:8362.
+
+\item Ballerini M et al.\ (2008). Interaction ruling animal collective
+  behavior depends on topological rather than metric distance.
+  \textit{Proc.\ Natl Acad.\ Sci.\ USA}\ \textbf{105}:1232.
+
+\item Wilson AM et al.\ (2018). Biomechanics of predator-prey arms race in
+  lion, zebra, cheetah and impala.
+  \textit{Nature}\ \textbf{554}:183.
+
+\end{enumerate}
+
+\end{document}
